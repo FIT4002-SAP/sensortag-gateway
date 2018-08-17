@@ -15,7 +15,7 @@ def handle_gyro(handle, value):
 
 
 def main():
-    log.basicConfig()
+    log.basicConfig(level=log.INFO)
     log.error("Hello!")
     try:
         log.info("Starting adapter...")
