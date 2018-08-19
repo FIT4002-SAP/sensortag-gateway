@@ -135,7 +135,7 @@ function setSensorData(lv_temp, lv_humid) {
     var strData = JSON.stringify(data);
     if (DEBUG_VALUE)
         console.log("Data: " + strData);
-    if {SHOULD_SEND_TO_SAP} {
+    if (SHOULD_SEND_TO_SAP) {
         if (strData.length > 46) {
             if (DEBUG_VALUE)
                 console.log("Sending Data to server");
