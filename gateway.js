@@ -13,6 +13,7 @@ var DEBUG_VALUE = true;
 var xtimestamp;
 var date = new Date();
 var time = date.getTime();
+var SHOULD_SEND_TO_SAP = false;
 
 // SAP Cloud Platform connection details
 var portIoT = 443;
@@ -134,32 +135,37 @@ function setSensorData(lv_temp, lv_humid) {
     var strData = JSON.stringify(data);
     if (DEBUG_VALUE)
         console.log("Data: " + strData);
-    if (strData.length > 46) {
-        if (DEBUG_VALUE)
-            console.log("Sending Data to server");
-        /* Process HTTP or HTTPS request */
-        options.agent = new http.Agent(options);
-        var request_callback = function (response) {
-            var body = '';
-            response.on('data', function (data) {
-                body += data;
-            });
-            response.on('end', function () {
-                if (DEBUG_VALUE)
-                    console.log("REQUEST END:", response.statusCode);
-            });
-            response.on('error', function (e) {
+    if {SHOULD_SEND_TO_SAP} {
+        if (strData.length > 46) {
+            if (DEBUG_VALUE)
+                console.log("Sending Data to server");
+            /* Process HTTP or HTTPS request */
+            options.agent = new http.Agent(options);
+            var request_callback = function (response) {
+                var body = '';
+                response.on('data', function (data) {
+                    body += data;
+                });
+                response.on('end', function () {
+                    if (DEBUG_VALUE)
+                        console.log("REQUEST END:", response.statusCode);
+                });
+                response.on('error', function (e) {
+                    console.error(e);
+                });
+            }
+            var request = http.request(options, request_callback);
+            request.on('error', function (e) {
                 console.error(e);
             });
+            request.write(strData);
+            request.end();
+        } else {
+            if (DEBUG_VALUE)
+                console.log("Incomplete Data");
         }
-        var request = http.request(options, request_callback);
-        request.on('error', function (e) {
-            console.error(e);
-        });
-        request.write(strData);
-        request.end();
     } else {
-        if (DEBUG_VALUE)
-            console.log("Incomplete Data");
+        console.log("Skipping sending data to Cloud Platform.")
     }
+    
 }
