@@ -16,28 +16,22 @@ var deviceId = '31d504ff-3ef9-4a7b-a3fe-c98297deb3cb';
 var messageTypeID = '5272a0aa64cec578f2f9';
 
 // SENSOR DATA BEGIN
-var sensor_data = { // initialise sensor data payload
-    "mode": "sync",
-    "messageType": messageTypeID,
-    "messages": [ // sample message payload; will be overwritten by the program
-        {
-            "timestamp": "{{$timestamp}}",
-            "sensorAccX": 0.01,
-            "sensorAccY": 0.01,
-            "sensorAccZ": 30.0,
-            "sensorBarometric": 1002.0,
-            "sensorGyroX": -1.0,
-            "sensorGyroY": -1.0,
-            "sensorGyroZ": -1.0,
-            "sensorHumidity": 20.0,
-            "sensorMagX": 29.68,
-            "sensorMagY": 10.79,
-            "sensorMagZ": -10.79,
-            "sensorObjectTemp": 16.47,
-            "sensorOptical": "1000",
-            "sensorTemp": 22.12
-        }
-    ]
+var sensor_data = {
+    timestamp: "{{$timestamp}}",
+    sensorAccX: 0.01,
+    sensorAccY: 0.01,
+    sensorAccZ: 30.0,
+    sensorBarometric: 1002.0,
+    sensorGyroX: -1.0,
+    sensorGyroY: -1.0,
+    sensorGyroZ: -1.0,
+    sensorHumidity: 20.0,
+    sensorMagX: 29.68,
+    sensorMagY: 10.79,
+    sensorMagZ: -10.79,
+    sensorObjectTemp: 16.47,
+    sensorOptical: "1000",
+    sensorTemp: 22.12
 }
 var lv_temp;
 var lv_humid;
@@ -55,7 +49,7 @@ var lv_magy;
 var lv_magz;
 var lv_deviceid = "";
 var number_of_sensors_enabled = 0;
-var number_of_sensors_to_enable = 8;
+var number_of_sensors_to_enable = 7;
 // END SENSOR DATA
 var DEBUG_VALUE = true;
 var xtimestamp;
@@ -193,9 +187,16 @@ SensorTag.discover(function (tag) {
 /******************************************************************/
 /* FUNCTION to get Temperature from the Sensor & update into HANA */
 /******************************************************************/
-function sendSensorData(data) {
+function sendSensorData(sensor_data_payload) {
     date = new Date();
     time = date.getTime();
+    var data = { // initialise sensor data payload
+        "mode": "sync",
+        "messageType": messageTypeID,
+        "messages": [ // sample message payload; will be overwritten by the program
+            sensor_data_payload
+        ]
+    }
     var strData = JSON.stringify(data);
     if (DEBUG_VALUE)
         console.log("Data: " + strData);
