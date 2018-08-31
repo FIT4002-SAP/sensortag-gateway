@@ -175,7 +175,7 @@ SensorTag.discover(function (tag) {
             time = date.getTime();
             sensor_data.timestamp = time;
             // send it
-            setSensorData(sensor_data);
+            sendSensorData(sensor_data);
             setTimeout(loop, 5000); // schedule it again
         });
     }
@@ -193,7 +193,7 @@ SensorTag.discover(function (tag) {
 /******************************************************************/
 /* FUNCTION to get Temperature from the Sensor & update into HANA */
 /******************************************************************/
-function setSensorData(data) {
+function sendSensorData(data) {
     date = new Date();
     time = date.getTime();
     var strData = JSON.stringify(data);
