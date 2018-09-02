@@ -55,7 +55,7 @@ var DEBUG_VALUE = true;
 var xtimestamp;
 var date = new Date();
 var time = date.getTime();
-var SHOULD_SEND_TO_SAP = false;
+var SHOULD_SEND_TO_SAP = true;
 
 var options = {
     host: hostIoT,
@@ -223,7 +223,11 @@ function sendSensorData(sensor_data_payload) {
             request.on('error', function (e) {
                 console.error(e);
             });
-            request.write(strData);
+            request.write(strData, function(error) {
+                console.error("Error while sending data to SAP.");
+                console.error(error);
+                throw error;
+            });
             request.end();
         } else {
             if (DEBUG_VALUE)
