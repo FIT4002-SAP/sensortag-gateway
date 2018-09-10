@@ -166,7 +166,7 @@ SensorTag.discover(function (tag) {
                 sensor_data.sensorOptical = lux;
             });
             date = new Date();
-            time = date.getTime();
+            time = String(Math.floor(date.getTime()/1000));
             sensor_data.timestamp = time;
             // send it
             sendSensorData(sensor_data);
