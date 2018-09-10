@@ -223,7 +223,7 @@ function sendSensorData(sensor_data_payload) {
             request.on('error', function (e) {
                 console.error(e);
             });
-            request.write(strData, function(error) {
+            request.write(strData, "utf-8", function(error) {
                 console.error("Error while sending data to SAP.");
                 console.error(error);
                 throw error;
