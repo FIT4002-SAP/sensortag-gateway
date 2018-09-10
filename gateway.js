@@ -214,7 +214,7 @@ function sendSensorData(sensor_data_payload) {
                 response.on('end', function () {
                     if (DEBUG_VALUE) {
                         console.log("REQUEST END:", response.statusCode);
-                        console.log("RESPONSE BODY:\n", response.read());
+                        console.log("RESPONSE BODY:\n", body);
                     }
                 });
                 response.on('error', function (e) {
