@@ -33,21 +33,6 @@ var sensor_data = {
     sensorOptical: "1000",
     sensorTemp: 22.12
 }
-var lv_temp;
-var lv_humid;
-var lv_optical;
-var lv_objectTemp;
-var lv_bar;
-var lv_accx;
-var lv_accy;
-var lv_accz;
-var lv_gyrox;
-var lv_gyroy;
-var lv_gyroz;
-var lv_magx;
-var lv_magy;
-var lv_magz;
-var lv_deviceid = "";
 var number_of_sensors_enabled = 0;
 var number_of_sensors_to_enable = 7;
 // END SENSOR DATA
