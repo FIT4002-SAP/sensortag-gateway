@@ -212,8 +212,10 @@ function sendSensorData(sensor_data_payload) {
                     body += data;
                 });
                 response.on('end', function () {
-                    if (DEBUG_VALUE)
+                    if (DEBUG_VALUE) {
                         console.log("REQUEST END:", response.statusCode);
+                        console.log("RESPONSE BODY:\n", response.read());
+                    }
                 });
                 response.on('error', function (e) {
                     console.error(e);
@@ -223,11 +225,11 @@ function sendSensorData(sensor_data_payload) {
             request.on('error', function (e) {
                 console.error(e);
             });
-            request.write(strData, "utf-8", function(error) {
+            request.write(strData/*, "utf-8", function(error) {
                 console.error("Error while sending data to SAP.");
                 console.error(error);
                 throw error;
-            });
+            }*/);
             request.end();
         } else {
             if (DEBUG_VALUE)
