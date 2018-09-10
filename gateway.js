@@ -152,7 +152,7 @@ SensorTag.discover(function (tag) {
                 sensor_data.sensorAccY = y;
                 sensor_data.sensorAccZ = z;
             });
-            tag.readMagnetoMeter(function (error, x, y, z) {
+            tag.readMagnetometer(function (error, x, y, z) {
                 sensor_data.sensorMagX = x;
                 sensor_data.sensorMagY = y;
                 sensor_data.sensorMagZ = z;
