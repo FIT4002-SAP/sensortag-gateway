@@ -18,20 +18,20 @@ var messageTypeID = '5272a0aa64cec578f2f9';
 // SENSOR DATA BEGIN
 var sensor_data = {
     timestamp: "{{$timestamp}}",
-    sensorAccX: 0.01,
-    sensorAccY: 0.01,
-    sensorAccZ: 30.0,
-    sensorBarometric: 1002.0,
+    sensorAccX: 0.0,
+    sensorAccY: 0.0,
+    sensorAccZ: 0.0,
+    sensorBarometric: 0.0,
     sensorGyroX: -1.0,
     sensorGyroY: -1.0,
     sensorGyroZ: -1.0,
-    sensorHumidity: 20.0,
-    sensorMagX: 29.68,
-    sensorMagY: 10.79,
-    sensorMagZ: -10.79,
-    sensorObjectTemp: 16.47,
-    sensorOptical: "1000",
-    sensorTemp: 22.12
+    sensorHumidity: 0.0,
+    sensorMagX: 0.0,
+    sensorMagY: 0.0,
+    sensorMagZ: 0.,
+    sensorObjectTemp: 0.0,
+    sensorOptical: "0",
+    sensorTemp: 0.0
 }
 var number_of_sensors_enabled = 0;
 var number_of_sensors_to_enable = 7;
@@ -121,7 +121,7 @@ SensorTag.discover(function (tag) {
             tag.disconnect();
         }
     }
-    
+
     function initialiseDataRetrievalLoop() {
         setImmediate(function loop() { // schedule this function
             tag.readIrTemperature(function (error, objectTemperature, ambientTemperature) {
