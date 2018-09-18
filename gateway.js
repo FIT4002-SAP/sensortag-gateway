@@ -1,6 +1,66 @@
-/* 	sensorTag IR Temperature sensor example
-*  Craig Cmehil, SAP SE (c) 2015
-*/
+var request = require("request");
+var fs = require("fs");
+
+//#########REPLACE WITH YOUR SAP CREDENTIALS#########################
+SAP_CLOUD_USERNAME = 'fit4002.intelligence@gmail.com';
+SAP_CLOUD_PASSWORD = '2018FIT4002?';
+var auth_string = Buffer.from(SAP_CLOUD_USERNAME + ':' + SAP_CLOUD_PASSWORD).toString('base64');
+//#################################################################
+
+var XSRFOptions = { method: 'GET',
+  url: 'https://bpmrulesruntimebpm-p2000319942trial.hanatrial.ondemand.com/rules-service/v1/rules/xsrf-token',
+  headers:
+   { 'cache-control': 'no-cache',
+     'x-csrf-token': 'Fetch',
+     authorization: 'Basic ' + auth_string } };
+
+var sendNotification = function(alert, data) {
+  var notificationOptions = { method: 'POST',
+    url: 'https://hcpms-p2000319942trial.hanatrial.ondemand.com/restnotification/application/com.sap.iot.manager/',
+    headers:
+     { 'Cache-Control': 'no-cache',
+       Authorization: 'Basic ' + auth_string,
+       'Content-Type': 'application/json' },
+    body:
+     { alert: alert,
+       data: data,
+       sound: 'default' },
+    json: true };
+    
+  request(notificationOptions, function (error, response, body) {
+    if (error) throw new Error(error);
+
+    console.log("Notification Successfully Sent!");
+  });
+}
+var checkTemperature = function(temperature, XSRF, cookie) {
+    var options = { method: 'POST',
+        url: 'https://bpmrulesruntimebpm-p2000319942trial.hanatrial.ondemand.com/rules-service/v1/rules/invoke',
+        qs: { rule_service_name: 'IoTManager::TemperatureService' },
+        headers:
+        {'Cache-Control': 'no-cache',
+         Authorization: 'Basic ' + auth_string,
+         'Content-Type': 'application/json',
+         'X-CSRF-Token': XSRF,
+          'Cookie': cookie},
+        body:
+        [ { __type__: 'IoTManagerDataObjects',
+           Temperature: temperature,
+           GyroX: 55,
+           GyroY: 55,
+           GyroZ: 55 } ],
+        json: true 
+    };
+    request(options, function (error, response, body) {
+      if (error) throw new Error(error);
+      console.log("Response From Business Rules API" + JSON.stringify(body));
+      if (body.length != 0) {
+        console.log("Temperature Warning! Sending Notification...");
+        sendNotification("fuck", "fuck");
+      }
+    });
+    
+}
 
 /* Choose the proper HTTP or HTTPS, SAP Cloud Platformrequires HTTPS */
 var http = require('https');
@@ -30,7 +90,7 @@ var sensor_data = {
     sensorMagY: 0.0,
     sensorMagZ: 0.,
     sensorObjectTemp: 0.0,
-    sensorOptical: "0",
+    sensorOptical: 0.0,
     sensorTemp: 0.0
 }
 var number_of_sensors_enabled = 0;
@@ -60,114 +120,131 @@ var options = {
 /***************************************************************/
 
 console.log("If not yet activated, then press the power button.");
-SensorTag.discover(function (tag) {
-    tag.on('disconnect', function () {
-        console.log('disconnected!');
-        process.exit(0);
-    });
 
-    function connectExecute() {
-        console.log('Connect Device and Execute Sensors');
-        tag.connectAndSetUp(enableSensors);
-    }
+request(XSRFOptions, function (error, response, body) {
+  if (error) throw new Error(error);
 
-    function enableSensors() {
-        /* Read device specifics */
-        tag.readDeviceName(function (error, deviceName) {
-            console.log('Device Name = ' + deviceName);
+  var app_XSRF = response.headers['x-csrf-token'];
+  var app_cookie = response.headers['set-cookie'];
+  console.log("Achieved XSRF token from SAP = " + app_XSRF);
+  //##################################################################
+    SensorTag.discover(function (tag) {
+        tag.on('disconnect', function () {
+            console.log('disconnected!');
+            process.exit(0);
         });
-        tag.readSystemId(function (error, systemId) {
-            console.log('System ID = ' + systemId);
-            lv_deviceid = systemId;
-        });
-        tag.readSerialNumber(function (error, serialNumber) {
-            console.log('Serial Number = ' + serialNumber);
-        });
-        tag.readFirmwareRevision(function (error, firmwareRevision) {
-            console.log('Firmware Rev = ' + firmwareRevision);
-        });
-        tag.readHardwareRevision(function (error, hardwareRevision) {
-            console.log('Hardware Rev = ' + hardwareRevision);
-        });
-        tag.readHardwareRevision(function (error, softwareRevision) {
-            console.log('Software Revision = ' + softwareRevision);
-        });
-        tag.readManufacturerName(function (error, manufacturerName) {
-            console.log('Manufacturer = ' + manufacturerName);
-        });
-        /* Enable Sensors */
-        console.log("Enabling sensors");
-        tag.enableIrTemperature(onSensorEnabled);
-        tag.enableHumidity(onSensorEnabled);
-        tag.enableMagnetometer(onSensorEnabled);
-        tag.enableBarometricPressure(onSensorEnabled);
-        tag.enableAccelerometer(onSensorEnabled);
-        tag.enableGyroscope(onSensorEnabled);
-        tag.enableLuxometer(onSensorEnabled);
 
-
-        console.log("*********************************************");
-        console.log(" To stop press both buttons on the SensorTag ");
-        console.log("*********************************************");
-        tag.notifySimpleKey(listenForButton);
-    }
-    function onSensorEnabled() {
-        number_of_sensors_enabled += 1;
-        if (number_of_sensors_enabled == number_of_sensors_to_enable) {
-            console.log("All sensors enabled! Retrieving data...");
-            initialiseDataRetrievalLoop();
-        } else if (number_of_sensors_enabled > number_of_sensors_to_enable) {
-            console.error("Number of sensors enabled exceeded limit! Please set the correct limit. Exiting.");
-            tag.disconnect();
+        function connectExecute() {
+            console.log('Connect Device and Execute Sensors');
+            tag.connectAndSetUp(enableSensors);
         }
-    }
 
-    function initialiseDataRetrievalLoop() {
-        setImmediate(function loop() { // schedule this function
-            tag.readIrTemperature(function (error, objectTemperature, ambientTemperature) {
-                sensor_data.sensorObjectTemp = objectTemperature;
-                sensor_data.sensorTemp = ambientTemperature;
+        function enableSensors() {
+            /* Read device specifics */
+            tag.readDeviceName(function (error, deviceName) {
+                console.log('Device Name = ' + deviceName);
             });
-            tag.readHumidity(function (error, temperature, humidity) {
-                // lv_temp = temperature.toFixed(1);
-                sensor_data.sensorHumidity = humidity.toFixed(1);
+            tag.readSystemId(function (error, systemId) {
+                console.log('System ID = ' + systemId);
+                lv_deviceid = systemId;
             });
-            tag.readAccelerometer(function (error, x, y, z) {
-                sensor_data.sensorAccX = x;
-                sensor_data.sensorAccY = y;
-                sensor_data.sensorAccZ = z;
+            tag.readSerialNumber(function (error, serialNumber) {
+                console.log('Serial Number = ' + serialNumber);
             });
-            tag.readMagnetometer(function (error, x, y, z) {
-                sensor_data.sensorMagX = x;
-                sensor_data.sensorMagY = y;
-                sensor_data.sensorMagZ = z;
+            tag.readFirmwareRevision(function (error, firmwareRevision) {
+                console.log('Firmware Rev = ' + firmwareRevision);
             });
-            tag.readGyroscope(function (error, x, y, z) {
-                sensor_data.sensorGyroX = x;
-                sensor_data.sensorGyroY = y;
-                sensor_data.sensorGyroZ = z;
+            tag.readHardwareRevision(function (error, hardwareRevision) {
+                console.log('Hardware Rev = ' + hardwareRevision);
             });
-            tag.readLuxometer(function (error, lux) {
-                sensor_data.sensorOptical = lux;
+            tag.readHardwareRevision(function (error, softwareRevision) {
+                console.log('Software Revision = ' + softwareRevision);
             });
-            date = new Date();
-            time = String(Math.floor(date.getTime()/1000));
-            sensor_data.timestamp = time;
-            // send it
-            sendSensorData(sensor_data);
-            setTimeout(loop, 5000); // schedule it again
-        });
-    }
-    function listenForButton() {
-        tag.on('simpleKeyChange', function (left, right) {
-            if (left && right) {
+            tag.readManufacturerName(function (error, manufacturerName) {
+                console.log('Manufacturer = ' + manufacturerName);
+            });
+            /* Enable Sensors */
+            console.log("Enabling sensors");
+            tag.enableIrTemperature(onSensorEnabled);
+            tag.enableHumidity(onSensorEnabled);
+            tag.enableMagnetometer(onSensorEnabled);
+            tag.enableBarometricPressure(onSensorEnabled);
+            tag.enableAccelerometer(onSensorEnabled);
+            tag.enableGyroscope(onSensorEnabled);
+            tag.enableLuxometer(onSensorEnabled);
+
+
+            console.log("*********************************************");
+            console.log(" To stop press both buttons on the SensorTag ");
+            console.log("*********************************************");
+            tag.notifySimpleKey(listenForButton);
+        }
+        function onSensorEnabled() {
+            number_of_sensors_enabled += 1;
+            if (number_of_sensors_enabled == number_of_sensors_to_enable) {
+                console.log("All sensors enabled! Retrieving data...");
+                initialiseDataRetrievalLoop();
+            } else if (number_of_sensors_enabled > number_of_sensors_to_enable) {
+                console.error("Number of sensors enabled exceeded limit! Please set the correct limit. Exiting.");
                 tag.disconnect();
             }
-        });
-    }
+        }
 
-    connectExecute();
+        function initialiseDataRetrievalLoop() {
+            setImmediate(function loop() { // schedule this function
+                tag.readIrTemperature(function (error, objectTemperature, ambientTemperature) {
+                    sensor_data.sensorObjectTemp = objectTemperature;
+                    sensor_data.sensorTemp = ambientTemperature;
+                });
+                tag.readHumidity(function (error, temperature, humidity) {
+                    // lv_temp = temperature.toFixed(1);
+                    sensor_data.sensorHumidity = humidity.toFixed(1);
+                });
+                tag.readAccelerometer(function (error, x, y, z) {
+                    sensor_data.sensorAccX = x;
+                    sensor_data.sensorAccY = y;
+                    sensor_data.sensorAccZ = z;
+                });
+                tag.readMagnetometer(function (error, x, y, z) {
+                    sensor_data.sensorMagX = x;
+                    sensor_data.sensorMagY = y;
+                    sensor_data.sensorMagZ = z;
+                });
+                tag.readGyroscope(function (error, x, y, z) {
+                    sensor_data.sensorGyroX = x;
+                    sensor_data.sensorGyroY = y;
+                    sensor_data.sensorGyroZ = z;
+                });
+                tag.readLuxometer(function (error, lux) {
+                    sensor_data.sensorOptical = lux;
+                });
+                date = new Date();
+                time = String(Math.floor(date.getTime()/1000));
+                sensor_data.timestamp = time;
+                //#############################################################
+                //call business rules API to check for violations
+
+                checkTemperature(sensor_data.sensorObjectTemp, app_XSRF, app_cookie);
+
+                //#############################################################
+                sendSensorData(sensor_data);
+                setTimeout(loop, 5000); // schedule it again
+            });
+        }
+        function listenForButton() {
+            tag.on('simpleKeyChange', function (left, right) {
+                if (left && right) {
+                    tag.disconnect();
+                }
+            });
+        }
+
+        connectExecute();
+    });
+
+  //##################################################################
 });
+
 
 /******************************************************************/
 /* FUNCTION to get Temperature from the Sensor & update into HANA */
@@ -210,11 +287,7 @@ function sendSensorData(sensor_data_payload) {
             request.on('error', function (e) {
                 console.error(e);
             });
-            request.write(strData/*, "utf-8", function(error) {
-                console.error("Error while sending data to SAP.");
-                console.error(error);
-                throw error;
-            }*/);
+            request.write(strData);
             request.end();
         } else {
             if (DEBUG_VALUE)
@@ -224,4 +297,4 @@ function sendSensorData(sensor_data_payload) {
         console.log("Skipping sending data to Cloud Platform.")
     }
 
-}
+}  

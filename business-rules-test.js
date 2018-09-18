@@ -39,24 +39,37 @@ request(XSRFOptions, function (error, response, body) {
     request(options, function (error, response, body) {
       if (error) throw new Error(error);
       console.log(body);
+      var ass = JSON.stringify(body)
+      console.log(body.length);
+      console.log(body[0]['enabled']);
     });
 });
 
 
-var notificationOptions = { method: 'POST',
-  url: 'https://hcpms-p2000319942trial.hanatrial.ondemand.com/restnotification/application/com.sap.iot.manager/',
-  headers:
-   { 'Cache-Control': 'no-cache',
-     Authorization: 'Basic Zml0NDAwMi5pbnRlbGxpZ2VuY2VAZ21haWwuY29tOjIwMThGSVQ0MDAyPw==',
-     'Content-Type': 'application/json' },
-  body:
-   { alert: 'myass',
-     data: 'please lord give me strength',
-     sound: 'default' },
-  json: true };
-/*
-request(notificationOptions, function (error, response, body) {
-  if (error) throw new Error(error);
 
-  console.log(body);
-});*/
+// request(notificationOptions, function (error, response, body) {
+//   if (error) throw new Error(error);
+
+//   console.log(body);
+// });
+
+var sendNotification = function() {
+  var notificationOptions = { method: 'POST',
+    url: 'https://hcpms-p2000319942trial.hanatrial.ondemand.com/restnotification/application/com.sap.iot.manager/',
+    headers:
+     { 'Cache-Control': 'no-cache',
+       Authorization: 'Basic Zml0NDAwMi5pbnRlbGxpZ2VuY2VAZ21haWwuY29tOjIwMThGSVQ0MDAyPw==',
+       'Content-Type': 'application/json' },
+    body:
+     { alert: 'myass',
+       data: 'please lord give me strength',
+       sound: 'default' },
+    json: true };
+    request(notificationOptions, function (error, response, body) {
+      if (error) throw new Error(error);
+      
+      console.log(body);
+    });
+}
+sendNotification()
+
