@@ -33,7 +33,7 @@ var sendNotification = function(alert, data) {
     console.log("Notification Successfully Sent!");
   });
 }
-var checkTemperature = function(temperature,gyrox, gyroy, gyroz, XSRF, cookie) {
+var checkData = function(temperature, gyrox, gyroy, gyroz, XSRF, cookie) {
     var options = { method: 'POST',
         url: 'https://bpmrulesruntimebpm-p2000319942trial.hanatrial.ondemand.com/rules-service/v1/rules/invoke',
         qs: { rule_service_name: 'IoTManager::IoTRuleService' },
