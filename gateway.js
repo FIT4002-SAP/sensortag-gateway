@@ -33,10 +33,10 @@ var sendNotification = function(alert, data) {
     console.log("Notification Successfully Sent!");
   });
 }
-var checkTemperature = function(temperature, XSRF, cookie) {
+var checkTemperature = function(temperature,gyrox, gyroy, gyroz, XSRF, cookie) {
     var options = { method: 'POST',
         url: 'https://bpmrulesruntimebpm-p2000319942trial.hanatrial.ondemand.com/rules-service/v1/rules/invoke',
-        qs: { rule_service_name: 'IoTManager::TemperatureService' },
+        qs: { rule_service_name: 'IoTManager::IoTRuleService' },
         headers:
         {'Cache-Control': 'no-cache',
          Authorization: 'Basic ' + auth_string,
@@ -46,18 +46,18 @@ var checkTemperature = function(temperature, XSRF, cookie) {
         body:
         [ { __type__: 'IoTManagerDataObjects',
            Temperature: temperature,
-           GyroX: 55,
-           GyroY: 55,
-           GyroZ: 55 } ],
+           GyroX: gyrox,
+           GyroY: gyroy,
+           GyroZ: gyroz } ],
         json: true 
     };
     request(options, function (error, response, body) {
       if (error) throw new Error(error);
       console.log("Response From Business Rules API" + JSON.stringify(body));
-      if (body.length != 0) {
-        console.log("Temperature Warning! Sending Notification...");
-        sendNotification("fuck", "fuck");
-      }
+      // if (body.length != 0) {
+        // console.log("Temperature Warning! Sending Notification...");
+        // sendNotification("fuck", "fuck");
+      // }
     });
     
 }
@@ -224,7 +224,7 @@ request(XSRFOptions, function (error, response, body) {
                 //#############################################################
                 //call business rules API to check for violations
 
-                checkTemperature(sensor_data.sensorObjectTemp, app_XSRF, app_cookie);
+                checkData(sensor_data.sensorObjectTemp, sensor_data.sensorGyroX, sensor_data.sensorGyroY, sensor_data.sensorGyroZ, app_XSRF, app_cookie);
 
                 //#############################################################
                 sendSensorData(sensor_data);
