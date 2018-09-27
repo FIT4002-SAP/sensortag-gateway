@@ -53,7 +53,11 @@ var checkData = function(temperature, gyrox, gyroy, gyroz, XSRF, cookie) {
     };
     request(options, function (error, response, body) {
       if (error) throw new Error(error);
+      console.log("#################################################################");
+      var data = JSON.strigify(body);
       console.log("Response From Business Rules API" + JSON.stringify(body));
+      console.log(data[0])
+      console.log("#################################################################");
       // if (body.length != 0) {
         // console.log("Temperature Warning! Sending Notification...");
         // sendNotification("fuck", "fuck");
