@@ -56,7 +56,7 @@ var checkData = function(temperature, gyrox, gyroy, gyroz, XSRF, cookie) {
       console.log("#################################################################");
       var data = JSON.stringify(body);
       console.log("Response From Business Rules API" + JSON.stringify(body));
-      console.log(data["MovementDetected"])
+      console.log(body["MovementDetected"]);
       console.log("#################################################################");
       // if (body.length != 0) {
         // console.log("Temperature Warning! Sending Notification...");
