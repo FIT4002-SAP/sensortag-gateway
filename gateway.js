@@ -86,11 +86,11 @@ var checkData = function(temperature, gyrox, gyroy, gyroz, XSRF, cookie) {
       console.log("#################################################################");
       if (body[0].MovementDetected) {
         console.log("Movement Warning! Sending Notification...");
-        sendNotification("Movement Warning Triggered!", "fuck");
+        sendNotification("Movement Warning Triggered!", "fudge");
       }
       if (body[0].TemperatureExceeded) {
         console.log("Temperature Warning! Sending Notification...");
-        sendNotification("Temperature Warning Triggered!", "fuck");
+        sendNotification("Temperature Warning Triggered!", "fudge");
       }
     });
     
