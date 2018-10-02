@@ -1,10 +1,35 @@
 var request = require("request");
 var fs = require("fs");
+var rl = require("readline-sync");
+var CREDENTIALS_FILENAME = '.credentials.txt';  // this optional file contains your saved base64 string
+
+function getCredentials(credentials_filename) {
+    /**
+     * @return the Basic authentication string in Base64
+     */
+    var credential;
+    try {
+        credential = fs.readFileSync(credentials_filename);
+    } catch(e) {
+        console.log("Cannot find credentials file.");
+    }
+    if (credential) {
+        return credential;
+    } else {
+        var SAP_CLOUD_USERNAME = rl.questionEMail('SAP CP Username (email): ');
+        var SAP_CLOUD_PASSWORD = rl.question('SAP CP Password: ', {
+            'hideEchoBack': true
+        });
+        var base64_auth = Buffer.from(SAP_CLOUD_USERNAME + ':' + SAP_CLOUD_PASSWORD).toString('base64');
+        if (rl.keyInYNStrict('Would you like to save your credentials (NOT SECURE - SAVED ON DISK)?')) {
+            fs.writeFileSync(credentials_filename, base64_auth);
+        }
+        return base64_auth;    
+    }
+}
 
 //#########REPLACE WITH YOUR SAP CREDENTIALS#########################
-SAP_CLOUD_USERNAME = 'fit4002.intelligence@gmail.com';
-SAP_CLOUD_PASSWORD = '2018FIT4002?';
-var auth_string = Buffer.from(SAP_CLOUD_USERNAME + ':' + SAP_CLOUD_PASSWORD).toString('base64');
+var auth_string = getCredentials(CREDENTIALS_FILENAME);
 //#################################################################
 
 var XSRFOptions = { method: 'GET',

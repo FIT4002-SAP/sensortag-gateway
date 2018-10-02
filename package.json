@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/FIT4002-SAP/sensortag-gateway#readme",
   "dependencies": {
+    "readline-sync": "^1.4.9",
     "request": "^2.88.0",
     "sensortag": "^1.3.0"
   }
