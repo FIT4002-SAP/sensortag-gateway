@@ -39,6 +39,35 @@ var XSRFOptions = { method: 'GET',
      'x-csrf-token': 'Fetch',
      authorization: 'Basic ' + auth_string } };
 
+var writeLogToDatabase = function(description, code) {
+    var logWriteOptions = { method: 'POST',
+      url: 'https://iotmmsp2000319942trial.hanatrial.ondemand.com/com.sap.iotservices.mms/v1/api/http/data/80c04384-651e-4420-9ed4-a56f52d0c805',
+      headers: 
+       { 'postman-token': '961b59ce-cc79-ffe8-b23b-1b90c8f7e266',
+         'cache-control': 'no-cache',
+         accept: '*/*',
+         'content-type': 'application/json;charset=utf-8',
+         authorization: 'Bearer 7153e5144e72f4949ccf777a387c35' },
+      body: 
+        {   "mode": "sync",
+            "messageType": "35970b0909ffb71c3f4f",
+            "messages": [
+                {
+                    "timestamp": "{{$timestamp}}",
+                    "description": description,
+                    "incident_code": code
+                }
+                ]
+        }
+    };
+
+    request(logWriteOptions, function (error, response, body) {
+      if (error) throw new Error(error);
+
+      console.log("Successfully wrote incident to database");
+    });
+}
+
 var sendNotification = function(alert, data) {
   var notificationOptions = { method: 'POST',
     url: 'https://hcpms-p2000319942trial.hanatrial.ondemand.com/restnotification/application/com.sap.iot.manager/',
@@ -58,6 +87,7 @@ var sendNotification = function(alert, data) {
     console.log("Notification Successfully Sent!");
   });
 }
+
 var checkData = function(temperature, gyrox, gyroy, gyroz, XSRF, cookie) {
     var options = { method: 'POST',
         url: 'https://bpmrulesruntimebpm-p2000319942trial.hanatrial.ondemand.com/rules-service/v1/rules/invoke',
@@ -87,10 +117,12 @@ var checkData = function(temperature, gyrox, gyroy, gyroz, XSRF, cookie) {
       if (body[0].MovementDetected) {
         console.log("Movement Warning! Sending Notification...");
         sendNotification("Movement Warning Triggered!", "fudge");
+        writeLogToDatabase("Movement Detected", "MOVEMENT");
       }
       if (body[0].TemperatureExceeded) {
         console.log("Temperature Warning! Sending Notification...");
         sendNotification("Temperature Warning Triggered!", "fudge");
+        writeLogToDatabase("Temperature Exceeded", "TEMPERATURE");
       }
     });
     
