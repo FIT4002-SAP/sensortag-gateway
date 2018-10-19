@@ -1,7 +1,7 @@
 # FIT4002 - SensorTag Gateway
 A gateway which discovers your SensorTag and sends data from it to SAP Cloud Platform.
 
-#Architecture 
+# Architecture 
 
 <img src="artefacts/iot_architecture.png" width="600">
 
