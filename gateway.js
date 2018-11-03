@@ -118,6 +118,17 @@ var writeLogToDatabase = function (description, code) {
      * @param {string} description description of the incident
      * @param {string} code incident code (i.e. "HEAT" or "MOVEMENT")
      */
+    var body = {
+        mode: "sync",
+        messageType: incidentLogMessageTypeID,
+        messages: [
+            {
+                timestamp: getCurrentTimeAsString(),
+                description: description,
+                incident_code: code
+            }
+        ]
+    };
     var logWriteOptions = {
         method: 'POST',
         url: bpmsInvokeRuleUrl,
@@ -125,18 +136,7 @@ var writeLogToDatabase = function (description, code) {
         {
             Authorization: authStrIncidentLog
         },
-        body:
-        {
-            mode: "sync",
-            messageType: incidentLogMessageTypeID,
-            messages: [
-                {
-                    timestamp: getCurrentTimeAsString(),
-                    description: description,
-                    incident_code: code
-                }
-            ]
-        }
+        body: body
     };
 
     request(logWriteOptions, function (error, response, body) {
