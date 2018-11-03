@@ -142,8 +142,17 @@ var writeLogToDatabase = function (description, code) {
 
     request(logWriteOptions, function (error, response, body) {
         if (error) throw new Error(error);
-
-        console.log("Successfully wrote incident to database");
+        switch (response.statusCode) {
+            case 201:
+                console.log("Successfully submitted incident log.");
+                break;
+            case 202:
+                console.error("HTTP202 - Partial error writing submitting incident log.");
+                break;
+            default:
+                throw new Error("HTTP" + response.statusCode + " - Non-200 status code returned while writing incident.");
+                break;
+        }
     });
 }
 
@@ -169,6 +178,9 @@ var sendNotification = function (alert, data) {
     request(notificationOptions, function (error, response, body) {
         if (error) throw new Error(error);
 
+        if (response.statusCode < 200 || response.statusCode > 299) {
+            throw new Error("HTTP" + response.statusCode + " - Non-200 status code returned while sending notification.");
+        }
         console.log("Notification Successfully Sent!");
     });
 }
@@ -198,6 +210,9 @@ var checkData = function (temperature, gyrox, gyroy, gyroz, XSRF, cookie) {
     };
     request(options, function (error, response, body) {
         if (error) throw new Error(error);
+        if (response.statusCode < 200 || response.statusCode > 299) {
+            throw new Error("HTTP" + response.statusCode + " - Non-200 status code returned while calling business rules.");
+        }
         console.log("#################################################################");
         var data = JSON.stringify(body);
         console.log("Response From Business Rules API" + JSON.stringify(body));
