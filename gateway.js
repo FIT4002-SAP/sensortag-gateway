@@ -7,18 +7,19 @@ var http = require('https');
 var SensorTag = require('sensortag');
 
 // SAP Cloud Platform connection details
-// IoT Service
+// IoT Service - obtained through SAP CP's IoT Service
 var portIoT = 443;
 var pathIoT = '/com.sap.iotservices.mms/v1/api/http/data/';
 var hostIoT = 'iotmmsp2000319942trial.hanatrial.ondemand.com';
 var authStrIoT = 'Bearer 26535de8eec3eb7c8d7cb0a8fb7335a1';
-var authStrIncidentLog = 'Bearer 7153e5144e72f4949ccf777a387c35';
 var iotDeviceId = '31d504ff-3ef9-4a7b-a3fe-c98297deb3cb';
-var incidentLogDeviceId = '80c04384-651e-4420-9ed4-a56f52d0c805';
 var iotDataMessageTypeID = '5272a0aa64cec578f2f9';
-var incidentLogMessageTypeID = '35970b0909ffb71c3f4f';
 
-var incidentLogUrl = 'https://' + hostIoT + pathIoT + incidentLogDeviceId;
+// Incident log - obtained through SAP CP's IoT Service
+var incidentLogMessageTypeID = '35970b0909ffb71c3f4f';
+var authStrIncidentLog = 'Bearer 7153e5144e72f4949ccf777a387c35';
+var incidentLogDeviceId = '80c04384-651e-4420-9ed4-a56f52d0c805';
+var incidentLogUrl = 'https://' + hostIoT + pathIoT + incidentLogDeviceId; // we reuse the IoT service in order to provide us with an API to persis incident logs
 
 // BPMS
 var bpmsUrl = 'https://bpmrulesruntimebpm-p2000319942trial.hanatrial.ondemand.com/rules-service/v1';
@@ -56,6 +57,8 @@ var SHOULD_SEND_TO_SAP = true; // set this to false if you do not want to commun
 
 function getCredentials(credentials_filename) {
     /**
+     * @description a helper function to get and store SAP credentials
+     * @param {string} credentials_filename name of file where credentials are going to be stored in
      * @return the Basic authentication string in Base64
      */
     var credential;
@@ -87,11 +90,12 @@ function getCurrentTimeAsString() {
     return String(Math.floor(date.getTime() / 1000));
 }
 
-var basicAuthString = getCredentials(CREDENTIALS_FILENAME);
+var basicAuthString = getCredentials(CREDENTIALS_FILENAME); // used to authenticate to services which require basic auth (SAP CP user + password)
 
 
 var writeLogToDatabase = function (description, code) {
     /**
+     * @description submits an incident log to the IoT Service
      * @param {string} description description of the incident
      * @param {string} code incident code (i.e. "HEAT" or "MOVEMENT")
      */
@@ -127,6 +131,11 @@ var writeLogToDatabase = function (description, code) {
 }
 
 var sendNotification = function (alert, data) {
+    /**
+     * @description sends a push notification to the IoT worker app (https://github.com/FIT4002-SAP/SAP) through SAP Mobile Service
+     * @param {string} alert the alert message to send to the iOS app
+     * @param {string} data data that will be received by the iOS app when the push notification is received.
+     */
     var notificationOptions = {
         method: 'POST',
         url: notificationServiceUrl,
@@ -156,6 +165,15 @@ var sendNotification = function (alert, data) {
 }
 
 var checkData = function (temperature, gyrox, gyroy, gyroz, XSRF, cookie) {
+    /**
+     * @description calls the Business Rules service in order to check whether or not there is abnormal data
+     * @param gyrox value of gyrox (part of gyroscope)
+     * @param gyroy value of gyroy (part of gyroscope)
+     * @param gyroz value of gyroz (part of gyroscope)
+     * @param temperature temperature value from the sensor
+     * @param XSRF xsrf token (obtained from Rule Service endpoint)
+     * @param cookie the cookie to be sent to Rule Service, used to authenticate to the Service
+     */
     var options = {
         method: 'POST',
         url: bpmsInvokeRuleUrl,
@@ -190,11 +208,13 @@ var checkData = function (temperature, gyrox, gyroy, gyroz, XSRF, cookie) {
         console.log("body is" + body[0].MovementDetected);
         console.log("#################################################################");
         if (body[0].MovementDetected) {
+            // movement detected! send notification
             console.log("Movement Warning! Sending Notification...");
             sendNotification("Movement Warning Triggered!", "MOVEMENT");
             writeLogToDatabase("Movement Detected", "MOVEMENT");
         }
         if (body[0].TemperatureExceeded) {
+            // tower is melting/freezing! send notification
             console.log("Temperature Warning! Sending Notification...");
             sendNotification("Temperature Warning Triggered!", "HEAT");
             writeLogToDatabase("Temperature Exceeded", "HEAT");
@@ -349,9 +369,7 @@ function sendSensorData(sensor_data_payload) {
     /**
      * @param sensor_data_payload the payload as defined by sensor_data
      */
-    date = new Date();
-    time = date.getTime();
-    var data = { // initialise sensor data payload
+    var data = { // initialise sensor data payload (this is going to be sent as a json through POST to the IoT Service API)
         "mode": "sync",
         "messageType": iotDataMessageTypeID,
         "messages": [
@@ -362,48 +380,44 @@ function sendSensorData(sensor_data_payload) {
     if (DEBUG_VALUE)
         console.log("Data: " + strData);
     if (SHOULD_SEND_TO_SAP) {
-        if (strData.length > 46) {
-            var options = {
-                host: hostIoT,
-                port: portIoT,
-                path: pathIoT + iotDeviceId,
-                agent: false,
-                headers: {
-                    'Authorization': authStrIoT,
-                    'Content-Type': 'application/json;charset=utf-8',
-                    'Accept': '*/*'
-                },
-                method: 'POST',
-            };
-            if (DEBUG_VALUE)
-                console.log("Sending Data to server");
-            /* Process HTTP or HTTPS request */
-            options.agent = new http.Agent(options);
-            var request_callback = function (response) {
-                var body = '';
-                response.on('data', function (data) {
-                    body += data;
-                });
-                response.on('end', function () {
-                    if (DEBUG_VALUE) {
-                        console.log("REQUEST END:", response.statusCode);
-                        console.log("RESPONSE BODY:\n", body);
-                    }
-                });
-                response.on('error', function (e) {
-                    console.error(e);
-                });
-            }
-            var request = http.request(options, request_callback);
-            request.on('error', function (e) {
+        // send data to server
+        var options = {
+            host: hostIoT,
+            port: portIoT,
+            path: pathIoT + iotDeviceId,
+            agent: false,
+            headers: {
+                'Authorization': authStrIoT,
+                'Content-Type': 'application/json;charset=utf-8',
+                'Accept': '*/*'
+            },
+            method: 'POST',
+        };
+        if (DEBUG_VALUE)
+            console.log("Sending Data to server");
+        /* Process HTTP or HTTPS request */
+        options.agent = new http.Agent(options);
+        var request_callback = function (response) {
+            var body = '';
+            response.on('data', function (data) {
+                body += data;
+            });
+            response.on('end', function () {
+                if (DEBUG_VALUE) {
+                    console.log("REQUEST END:", response.statusCode);
+                    console.log("RESPONSE BODY:\n", body);
+                }
+            });
+            response.on('error', function (e) {
                 console.error(e);
             });
-            request.write(strData);
-            request.end();
-        } else {
-            if (DEBUG_VALUE)
-                console.log("Incomplete Data");
         }
+        var request = http.request(options, request_callback);
+        request.on('error', function (e) {
+            console.error(e);
+        });
+        request.write(strData);
+        request.end();
     } else {
         console.log("Skipping sending data to Cloud Platform.")
     }
