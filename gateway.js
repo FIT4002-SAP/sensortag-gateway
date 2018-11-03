@@ -18,7 +18,7 @@ var incidentLogDeviceId = '80c04384-651e-4420-9ed4-a56f52d0c805';
 var iotDataMessageTypeID = '5272a0aa64cec578f2f9';
 var incidentLogMessageTypeID = '35970b0909ffb71c3f4f';
 
-var incidentLogUrl = 'https://' + hostIoT + pathIoT + incidentLogMessageTypeID;
+var incidentLogUrl = 'https://' + hostIoT + pathIoT + incidentLogDeviceId;
 
 // BPMS
 var bpmsUrl = 'https://bpmrulesruntimebpm-p2000319942trial.hanatrial.ondemand.com/rules-service/v1';
