@@ -2,144 +2,29 @@ var request = require("request");
 var fs = require("fs");
 var rl = require("readline-sync");
 var CREDENTIALS_FILENAME = '.credentials.txt';  // this optional file contains your saved base64 string
-
-function getCredentials(credentials_filename) {
-    /**
-     * @return the Basic authentication string in Base64
-     */
-    var credential;
-    try {
-        credential = fs.readFileSync(credentials_filename);
-    } catch(e) {
-        console.log("Cannot find credentials file.");
-    }
-    if (credential) {
-        return credential;
-    } else {
-        var SAP_CLOUD_USERNAME = rl.questionEMail('SAP CP Username (email): ');
-        var SAP_CLOUD_PASSWORD = rl.question('SAP CP Password: ', {
-            'hideEchoBack': true
-        });
-        var base64_auth = Buffer.from(SAP_CLOUD_USERNAME + ':' + SAP_CLOUD_PASSWORD).toString('base64');
-        if (rl.keyInYNStrict('Would you like to save your credentials (NOT SECURE - SAVED ON DISK)?')) {
-            fs.writeFileSync(credentials_filename, base64_auth);
-        }
-        return base64_auth;    
-    }
-}
-
-//#########REPLACE WITH YOUR SAP CREDENTIALS#########################
-var auth_string = getCredentials(CREDENTIALS_FILENAME);
-//#################################################################
-
-var XSRFOptions = { method: 'GET',
-  url: 'https://bpmrulesruntimebpm-p2000319942trial.hanatrial.ondemand.com/rules-service/v1/rules/xsrf-token',
-  headers:
-   { 'cache-control': 'no-cache',
-     'x-csrf-token': 'Fetch',
-     authorization: 'Basic ' + auth_string } };
-
-var writeLogToDatabase = function(description, code) {
-    var logWriteOptions = { method: 'POST',
-      url: 'https://iotmmsp2000319942trial.hanatrial.ondemand.com/com.sap.iotservices.mms/v1/api/http/data/80c04384-651e-4420-9ed4-a56f52d0c805',
-      headers: 
-       { 'postman-token': '961b59ce-cc79-ffe8-b23b-1b90c8f7e266',
-         'cache-control': 'no-cache',
-         accept: '*/*',
-         'content-type': 'application/json;charset=utf-8',
-         authorization: 'Bearer 7153e5144e72f4949ccf777a387c35' },
-      body: 
-        {   "mode": "sync",
-            "messageType": "35970b0909ffb71c3f4f",
-            "messages": [
-                {
-                    "timestamp": "{{$timestamp}}",
-                    "description": description,
-                    "incident_code": code
-                }
-                ]
-        }
-    };
-
-    request(logWriteOptions, function (error, response, body) {
-      if (error) throw new Error(error);
-
-      console.log("Successfully wrote incident to database");
-    });
-}
-
-var sendNotification = function(alert, data) {
-  var notificationOptions = { method: 'POST',
-    url: 'https://hcpms-p2000319942trial.hanatrial.ondemand.com/restnotification/application/com.sap.iot.manager/',
-    headers:
-     { 'Cache-Control': 'no-cache',
-       Authorization: 'Basic ' + auth_string,
-       'Content-Type': 'application/json' },
-    body:
-     { alert: alert,
-       data: data,
-       sound: 'default' },
-    json: true };
-    
-  request(notificationOptions, function (error, response, body) {
-    if (error) throw new Error(error);
-
-    console.log("Notification Successfully Sent!");
-  });
-}
-
-var checkData = function(temperature, gyrox, gyroy, gyroz, XSRF, cookie) {
-    var options = { method: 'POST',
-        url: 'https://bpmrulesruntimebpm-p2000319942trial.hanatrial.ondemand.com/rules-service/v1/rules/invoke',
-        qs: { rule_service_name: 'IoTManager::IoTRuleService' },
-        headers:
-        {'Cache-Control': 'no-cache',
-         Authorization: 'Basic ' + auth_string,
-         'Content-Type': 'application/json',
-         'X-CSRF-Token': XSRF,
-          'Cookie': cookie},
-        body:
-        [ { __type__: 'IoTManagerDataObjects',
-           Temperature: temperature,
-           GyroX: gyrox,
-           GyroY: gyroy,
-           GyroZ: gyroz } ],
-        json: true 
-    };
-    request(options, function (error, response, body) {
-      if (error) throw new Error(error);
-      console.log("#################################################################");
-      var data = JSON.stringify(body);
-      console.log("Response From Business Rules API" + JSON.stringify(body));
-      console.log("body is" + body);
-      console.log("body is" + body[0].MovementDetected);
-      console.log("#################################################################");
-      if (body[0].MovementDetected) {
-        console.log("Movement Warning! Sending Notification...");
-        sendNotification("Movement Warning Triggered!", "MOVEMENT");
-        writeLogToDatabase("Movement Detected", "MOVEMENT");
-      }
-      if (body[0].TemperatureExceeded) {
-        console.log("Temperature Warning! Sending Notification...");
-        sendNotification("Temperature Warning Triggered!", "HEAT");
-        writeLogToDatabase("Temperature Exceeded", "HEAT");
-      }
-    });
-    
-}
-
 /* Choose the proper HTTP or HTTPS, SAP Cloud Platformrequires HTTPS */
 var http = require('https');
-
 var SensorTag = require('sensortag');
 
 // SAP Cloud Platform connection details
+// IoT Service
 var portIoT = 443;
 var pathIoT = '/com.sap.iotservices.mms/v1/api/http/data/';
 var hostIoT = 'iotmmsp2000319942trial.hanatrial.ondemand.com';
 var authStrIoT = 'Bearer 26535de8eec3eb7c8d7cb0a8fb7335a1';
+var authStrIncidentLog = 'Bearer 7153e5144e72f4949ccf777a387c35';
 var deviceId = '31d504ff-3ef9-4a7b-a3fe-c98297deb3cb';
-var messageTypeID = '5272a0aa64cec578f2f9';
+var iotDataMessageTypeID = '5272a0aa64cec578f2f9';
+var incidentLogMessageTypeID = '35970b0909ffb71c3f4f';
+
+// BPMS
+var bpmsUrl = 'https://bpmrulesruntimebpm-p2000319942trial.hanatrial.ondemand.com/rules-service/v1';
+var bpmsXSRFTokenUrl = bpmsUrl + '/rules/xsrf-token';
+var bpmsInvokeRuleUrl = bpmsUrl + '/rules/invoke';
+var ruleServiceName = 'IoTManager::IoTRuleService';
+
+// Notification Service
+var notificationServiceUrl = 'https://hcpms-p2000319942trial.hanatrial.ondemand.com/restnotification/application/com.sap.iot.manager/';
 
 // SENSOR DATA BEGIN
 var sensor_data = {
@@ -159,14 +44,15 @@ var sensor_data = {
     sensorOptical: 0.0,
     sensorTemp: 0.0
 }
-var number_of_sensors_enabled = 0;
-var number_of_sensors_to_enable = 7;
+var numberOfSensorsEnabled = 0; // basically we're going to count the number of sensors enabled, and start the whole loop when it reaches 7
+var numberOfSensorsToEnable = 7;
 // END SENSOR DATA
-var DEBUG_VALUE = true;
+
+var DEBUG_VALUE = true; // print verbose debug statements
 var xtimestamp;
 var date = new Date();
 var time = date.getTime();
-var SHOULD_SEND_TO_SAP = true;
+var SHOULD_SEND_TO_SAP = true; // set this to false if you do not want to communicate with cloud platform
 
 var options = {
     host: hostIoT,
@@ -181,28 +67,178 @@ var options = {
     method: 'POST',
 };
 
+function getCredentials(credentials_filename) {
+    /**
+     * @return the Basic authentication string in Base64
+     */
+    var credential;
+    try {
+        credential = fs.readFileSync(credentials_filename);
+    } catch (e) {
+        console.log("Cannot find credentials file.");
+    }
+    if (credential) {
+        return credential;
+    } else {
+        var SAP_CLOUD_USERNAME = rl.questionEMail('SAP CP Username (email): ');
+        var SAP_CLOUD_PASSWORD = rl.question('SAP CP Password: ', {
+            'hideEchoBack': true
+        });
+        var base64_auth = Buffer.from(SAP_CLOUD_USERNAME + ':' + SAP_CLOUD_PASSWORD).toString('base64');
+        if (rl.keyInYNStrict('Would you like to save your credentials (NOT SECURE - SAVED ON DISK)?')) {
+            fs.writeFileSync(credentials_filename, base64_auth);
+        }
+        return base64_auth;
+    }
+}
+
+function getCurrentTimeAsString() {
+    /**
+     * @returns {String} the current time in Epoch time
+     */
+    date = new Date();
+    return String(Math.floor(date.getTime() / 1000));
+}
+
+var basicAuthString = getCredentials(CREDENTIALS_FILENAME);
+
+var XSRFOptions = {
+    method: 'GET',
+    url: bpmsXSRFTokenUrl,
+    headers:
+    {
+        'cache-control': 'no-cache',
+        'x-csrf-token': 'Fetch',
+        authorization: 'Basic ' + basicAuthString
+    }
+};
+
+var writeLogToDatabase = function (description, code) {
+    /**
+     * @param {string} description description of the incident
+     * @param {string} code incident code (i.e. "HEAT" or "MOVEMENT")
+     */
+    var logWriteOptions = {
+        method: 'POST',
+        url: bpmsInvokeRuleUrl,
+        headers:
+        {
+            Authorization: authStrIncidentLog
+        },
+        body:
+        {
+            mode: "sync",
+            messageType: incidentLogMessageTypeID,
+            messages: [
+                {
+                    timestamp: getCurrentTimeAsString(),
+                    description: description,
+                    incident_code: code
+                }
+            ]
+        }
+    };
+
+    request(logWriteOptions, function (error, response, body) {
+        if (error) throw new Error(error);
+
+        console.log("Successfully wrote incident to database");
+    });
+}
+
+var sendNotification = function (alert, data) {
+    var notificationOptions = {
+        method: 'POST',
+        url: notificationServiceUrl,
+        headers:
+        {
+            'Cache-Control': 'no-cache',
+            Authorization: 'Basic ' + basicAuthString,
+            'Content-Type': 'application/json'
+        },
+        body:
+        {
+            alert: alert,
+            data: data,
+            sound: 'default'
+        },
+        json: true
+    };
+
+    request(notificationOptions, function (error, response, body) {
+        if (error) throw new Error(error);
+
+        console.log("Notification Successfully Sent!");
+    });
+}
+
+var checkData = function (temperature, gyrox, gyroy, gyroz, XSRF, cookie) {
+    var options = {
+        method: 'POST',
+        url: bpmsInvokeRuleUrl,
+        qs: { rule_service_name: ruleServiceName },
+        headers:
+        {
+            'Cache-Control': 'no-cache',
+            Authorization: 'Basic ' + basicAuthString,
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': XSRF,
+            'Cookie': cookie
+        },
+        body:
+            [{
+                __type__: 'IoTManagerDataObjects',
+                Temperature: temperature,
+                GyroX: gyrox,
+                GyroY: gyroy,
+                GyroZ: gyroz
+            }],
+        json: true
+    };
+    request(options, function (error, response, body) {
+        if (error) throw new Error(error);
+        console.log("#################################################################");
+        var data = JSON.stringify(body);
+        console.log("Response From Business Rules API" + JSON.stringify(body));
+        console.log("body is" + body);
+        console.log("body is" + body[0].MovementDetected);
+        console.log("#################################################################");
+        if (body[0].MovementDetected) {
+            console.log("Movement Warning! Sending Notification...");
+            sendNotification("Movement Warning Triggered!", "MOVEMENT");
+            writeLogToDatabase("Movement Detected", "MOVEMENT");
+        }
+        if (body[0].TemperatureExceeded) {
+            console.log("Temperature Warning! Sending Notification...");
+            sendNotification("Temperature Warning Triggered!", "HEAT");
+            writeLogToDatabase("Temperature Exceeded", "HEAT");
+        }
+    });
+
+}
+
 /***************************************************************/
 /* Coding to access TI SensorTag and values of various sensors */
 /***************************************************************/
 
 console.log("If not yet activated, then press the power button.");
 
+// get XSRF token from Business Rules
 request(XSRFOptions, function (error, response, body) {
-  if (error) throw new Error(error);
+    if (error) throw new Error(error);
 
-  var app_XSRF = response.headers['x-csrf-token'];
-  var app_cookie = response.headers['set-cookie'];
-  console.log("Achieved XSRF token from SAP = " + app_XSRF);
-  //##################################################################
+    var app_XSRF = response.headers['x-csrf-token'];
+    var app_cookie = response.headers['set-cookie'];
+    console.log("Achieved XSRF token from SAP = " + app_XSRF);
     SensorTag.discover(function (tag) {
         tag.on('disconnect', function () {
             console.log('disconnected!');
             process.exit(0);
         });
 
-        function connectExecute() {
+        function start() {
             console.log('Connect Device and Execute Sensors');
-            tag.connectAndSetUp(enableSensors);
+            tag.connectAndSetUp(enableSensors); // enableSensors()
         }
 
         function enableSensors() {
@@ -243,20 +279,33 @@ request(XSRFOptions, function (error, response, body) {
             console.log("*********************************************");
             console.log(" To stop press both buttons on the SensorTag ");
             console.log("*********************************************");
-            tag.notifySimpleKey(listenForButton);
+            tag.notifySimpleKey(onBothKeysPressed); // if you press both keys, the program exits
         }
+
         function onSensorEnabled() {
-            number_of_sensors_enabled += 1;
-            if (number_of_sensors_enabled == number_of_sensors_to_enable) {
+            /* basically callback function for when the sensors are enabled; checks that all sensors are enabled before retrieving data */
+            numberOfSensorsEnabled += 1;
+            if (numberOfSensorsEnabled == numberOfSensorsToEnable) {
                 console.log("All sensors enabled! Retrieving data...");
                 initialiseDataRetrievalLoop();
-            } else if (number_of_sensors_enabled > number_of_sensors_to_enable) {
+            } else if (numberOfSensorsEnabled > numberOfSensorsToEnable) {
                 console.error("Number of sensors enabled exceeded limit! Please set the correct limit. Exiting.");
                 tag.disconnect();
             }
         }
 
+        function onBothKeysPressed() {
+            tag.on('simpleKeyChange', function (left, right) {
+                if (left && right) {
+                    tag.disconnect();
+                }
+            });
+        }
+
         function initialiseDataRetrievalLoop() {
+            /**
+             * main loop to retrieve data from the tags and push data to cloud platform
+             */
             setImmediate(function loop() { // schedule this function
                 tag.readIrTemperature(function (error, objectTemperature, ambientTemperature) {
                     sensor_data.sensorObjectTemp = objectTemperature;
@@ -284,44 +333,32 @@ request(XSRFOptions, function (error, response, body) {
                 tag.readLuxometer(function (error, lux) {
                     sensor_data.sensorOptical = lux;
                 });
-                date = new Date();
-                time = String(Math.floor(date.getTime()/1000));
-                sensor_data.timestamp = time;
-                //#############################################################
-                //call business rules API to check for violations
-
+                sensor_data.timestamp = getCurrentTimeAsString();
+                // call business rules API to check for violations
                 checkData(sensor_data.sensorObjectTemp, sensor_data.sensorGyroX, sensor_data.sensorGyroY, sensor_data.sensorGyroZ, app_XSRF, app_cookie);
-
-                //#############################################################
-                sendSensorData(sensor_data);
+                sendSensorData(sensor_data); // send the sensor data
                 setTimeout(loop, 5000); // schedule it again
             });
         }
-        function listenForButton() {
-            tag.on('simpleKeyChange', function (left, right) {
-                if (left && right) {
-                    tag.disconnect();
-                }
-            });
-        }
 
-        connectExecute();
+        start();
     });
-
-  //##################################################################
 });
 
 
 /******************************************************************/
-/* FUNCTION to get Temperature from the Sensor & update into HANA */
+/* function to push sensor data to SAP Cloud Platform */
 /******************************************************************/
 function sendSensorData(sensor_data_payload) {
+    /**
+     * @param sensor_data_payload the payload as defined by sensor_data
+     */
     date = new Date();
     time = date.getTime();
     var data = { // initialise sensor data payload
         "mode": "sync",
-        "messageType": messageTypeID,
-        "messages": [ // sample message payload; will be overwritten by the program
+        "messageType": iotDataMessageTypeID,
+        "messages": [
             sensor_data_payload
         ]
     }
