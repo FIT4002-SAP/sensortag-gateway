@@ -13,9 +13,12 @@ var pathIoT = '/com.sap.iotservices.mms/v1/api/http/data/';
 var hostIoT = 'iotmmsp2000319942trial.hanatrial.ondemand.com';
 var authStrIoT = 'Bearer 26535de8eec3eb7c8d7cb0a8fb7335a1';
 var authStrIncidentLog = 'Bearer 7153e5144e72f4949ccf777a387c35';
-var deviceId = '31d504ff-3ef9-4a7b-a3fe-c98297deb3cb';
+var iotDeviceId = '31d504ff-3ef9-4a7b-a3fe-c98297deb3cb';
+var incidentLogDeviceId = '80c04384-651e-4420-9ed4-a56f52d0c805';
 var iotDataMessageTypeID = '5272a0aa64cec578f2f9';
 var incidentLogMessageTypeID = '35970b0909ffb71c3f4f';
+
+var incidentLogUrl = 'https://' + hostIoT + pathIoT + incidentLogMessageTypeID;
 
 // BPMS
 var bpmsUrl = 'https://bpmrulesruntimebpm-p2000319942trial.hanatrial.ondemand.com/rules-service/v1';
@@ -49,23 +52,7 @@ var numberOfSensorsToEnable = 7;
 // END SENSOR DATA
 
 var DEBUG_VALUE = true; // print verbose debug statements
-var xtimestamp;
-var date = new Date();
-var time = date.getTime();
 var SHOULD_SEND_TO_SAP = true; // set this to false if you do not want to communicate with cloud platform
-
-var options = {
-    host: hostIoT,
-    port: portIoT,
-    path: pathIoT + deviceId,
-    agent: false,
-    headers: {
-        'Authorization': authStrIoT,
-        'Content-Type': 'application/json;charset=utf-8',
-        'Accept': '*/*'
-    },
-    method: 'POST',
-};
 
 function getCredentials(credentials_filename) {
     /**
@@ -102,16 +89,6 @@ function getCurrentTimeAsString() {
 
 var basicAuthString = getCredentials(CREDENTIALS_FILENAME);
 
-var XSRFOptions = {
-    method: 'GET',
-    url: bpmsXSRFTokenUrl,
-    headers:
-    {
-        'cache-control': 'no-cache',
-        'x-csrf-token': 'Fetch',
-        authorization: 'Basic ' + basicAuthString
-    }
-};
 
 var writeLogToDatabase = function (description, code) {
     /**
@@ -131,7 +108,7 @@ var writeLogToDatabase = function (description, code) {
     };
     var logWriteOptions = {
         method: 'POST',
-        url: bpmsInvokeRuleUrl,
+        url: incidentLogUrl,
         headers:
         {
             Authorization: authStrIncidentLog
@@ -233,6 +210,16 @@ var checkData = function (temperature, gyrox, gyroy, gyroz, XSRF, cookie) {
 console.log("If not yet activated, then press the power button.");
 
 // get XSRF token from Business Rules
+var XSRFOptions = {
+    method: 'GET',
+    url: bpmsXSRFTokenUrl,
+    headers:
+    {
+        'cache-control': 'no-cache',
+        'x-csrf-token': 'Fetch',
+        authorization: 'Basic ' + basicAuthString
+    }
+};
 request(XSRFOptions, function (error, response, body) {
     if (error) throw new Error(error);
 
@@ -376,6 +363,18 @@ function sendSensorData(sensor_data_payload) {
         console.log("Data: " + strData);
     if (SHOULD_SEND_TO_SAP) {
         if (strData.length > 46) {
+            var options = {
+                host: hostIoT,
+                port: portIoT,
+                path: pathIoT + iotDeviceId,
+                agent: false,
+                headers: {
+                    'Authorization': authStrIoT,
+                    'Content-Type': 'application/json;charset=utf-8',
+                    'Accept': '*/*'
+                },
+                method: 'POST',
+            };
             if (DEBUG_VALUE)
                 console.log("Sending Data to server");
             /* Process HTTP or HTTPS request */
