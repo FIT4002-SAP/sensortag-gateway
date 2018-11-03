@@ -136,7 +136,8 @@ var writeLogToDatabase = function (description, code) {
         {
             Authorization: authStrIncidentLog
         },
-        body: body
+        body: body,
+        json: true
     };
 
     request(logWriteOptions, function (error, response, body) {
