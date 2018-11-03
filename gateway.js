@@ -142,17 +142,10 @@ var writeLogToDatabase = function (description, code) {
 
     request(logWriteOptions, function (error, response, body) {
         if (error) throw new Error(error);
-        switch (response.statusCode) {
-            case 201:
-                console.log("Successfully submitted incident log.");
-                break;
-            case 202:
-                console.error("HTTP202 - Partial error writing submitting incident log.");
-                break;
-            default:
-                throw new Error("HTTP" + response.statusCode + " - Non-200 status code returned while writing incident.");
-                break;
+        if (response.statusCode < 200 || response.statusCode > 299) {
+            throw new Error("HTTP" + response.statusCode + " - Non-200 status code returned while writing incident.");
         }
+        console.log("Successfully submitted incident log.");
     });
 }
 
