@@ -2,112 +2,33 @@ var request = require("request");
 var fs = require("fs");
 var rl = require("readline-sync");
 var CREDENTIALS_FILENAME = '.credentials.txt';  // this optional file contains your saved base64 string
-
-function getCredentials(credentials_filename) {
-    /**
-     * @return the Basic authentication string in Base64
-     */
-    var credential;
-    try {
-        credential = fs.readFileSync(credentials_filename);
-    } catch(e) {
-        console.log("Cannot find credentials file.");
-    }
-    if (credential) {
-        return credential;
-    } else {
-        var SAP_CLOUD_USERNAME = rl.questionEMail('SAP CP Username (email): ');
-        var SAP_CLOUD_PASSWORD = rl.question('SAP CP Password: ', {
-            'hideEchoBack': true
-        });
-        var base64_auth = Buffer.from(SAP_CLOUD_USERNAME + ':' + SAP_CLOUD_PASSWORD).toString('base64');
-        if (rl.keyInYNStrict('Would you like to save your credentials (NOT SECURE - SAVED ON DISK)?')) {
-            fs.writeFileSync(credentials_filename, base64_auth);
-        }
-        return base64_auth;    
-    }
-}
-
-//#########REPLACE WITH YOUR SAP CREDENTIALS#########################
-var auth_string = getCredentials(CREDENTIALS_FILENAME);
-//#################################################################
-
-var XSRFOptions = { method: 'GET',
-  url: 'https://bpmrulesruntimebpm-p2000319942trial.hanatrial.ondemand.com/rules-service/v1/rules/xsrf-token',
-  headers:
-   { 'cache-control': 'no-cache',
-     'x-csrf-token': 'Fetch',
-     authorization: 'Basic ' + auth_string } };
-
-var sendNotification = function(alert, data) {
-  var notificationOptions = { method: 'POST',
-    url: 'https://hcpms-p2000319942trial.hanatrial.ondemand.com/restnotification/application/com.sap.iot.manager/',
-    headers:
-     { 'Cache-Control': 'no-cache',
-       Authorization: 'Basic ' + auth_string,
-       'Content-Type': 'application/json' },
-    body:
-     { alert: alert,
-       data: data,
-       sound: 'default' },
-    json: true };
-    
-  request(notificationOptions, function (error, response, body) {
-    if (error) throw new Error(error);
-
-    console.log("Notification Successfully Sent!");
-  });
-}
-var checkData = function(temperature, gyrox, gyroy, gyroz, XSRF, cookie) {
-    var options = { method: 'POST',
-        url: 'https://bpmrulesruntimebpm-p2000319942trial.hanatrial.ondemand.com/rules-service/v1/rules/invoke',
-        qs: { rule_service_name: 'IoTManager::IoTRuleService' },
-        headers:
-        {'Cache-Control': 'no-cache',
-         Authorization: 'Basic ' + auth_string,
-         'Content-Type': 'application/json',
-         'X-CSRF-Token': XSRF,
-          'Cookie': cookie},
-        body:
-        [ { __type__: 'IoTManagerDataObjects',
-           Temperature: temperature,
-           GyroX: gyrox,
-           GyroY: gyroy,
-           GyroZ: gyroz } ],
-        json: true 
-    };
-    request(options, function (error, response, body) {
-      if (error) throw new Error(error);
-      console.log("#################################################################");
-      var data = JSON.stringify(body);
-      console.log("Response From Business Rules API" + JSON.stringify(body));
-      console.log("body is" + body);
-      console.log("body is" + body[0].MovementDetected);
-      console.log("#################################################################");
-      if (body[0].MovementDetected) {
-        console.log("Movement Warning! Sending Notification...");
-        sendNotification("Movement Warning Triggered!", "fudge");
-      }
-      if (body[0].TemperatureExceeded) {
-        console.log("Temperature Warning! Sending Notification...");
-        sendNotification("Temperature Warning Triggered!", "fudge");
-      }
-    });
-    
-}
-
 /* Choose the proper HTTP or HTTPS, SAP Cloud Platformrequires HTTPS */
 var http = require('https');
-
 var SensorTag = require('sensortag');
 
 // SAP Cloud Platform connection details
+// IoT Service - obtained through SAP CP's IoT Service
 var portIoT = 443;
 var pathIoT = '/com.sap.iotservices.mms/v1/api/http/data/';
 var hostIoT = 'iotmmsp2000319942trial.hanatrial.ondemand.com';
 var authStrIoT = 'Bearer 26535de8eec3eb7c8d7cb0a8fb7335a1';
-var deviceId = '31d504ff-3ef9-4a7b-a3fe-c98297deb3cb';
-var messageTypeID = '5272a0aa64cec578f2f9';
+var iotDeviceId = '31d504ff-3ef9-4a7b-a3fe-c98297deb3cb';
+var iotDataMessageTypeID = '5272a0aa64cec578f2f9';
+
+// Incident log - obtained through SAP CP's IoT Service
+var incidentLogMessageTypeID = '35970b0909ffb71c3f4f';
+var authStrIncidentLog = 'Bearer 7153e5144e72f4949ccf777a387c35';
+var incidentLogDeviceId = '80c04384-651e-4420-9ed4-a56f52d0c805';
+var incidentLogUrl = 'https://' + hostIoT + pathIoT + incidentLogDeviceId; // we reuse the IoT service in order to provide us with an API to persis incident logs
+
+// BPMS
+var bpmsUrl = 'https://bpmrulesruntimebpm-p2000319942trial.hanatrial.ondemand.com/rules-service/v1';
+var bpmsXSRFTokenUrl = bpmsUrl + '/rules/xsrf-token';
+var bpmsInvokeRuleUrl = bpmsUrl + '/rules/invoke';
+var ruleServiceName = 'IoTManager::IoTRuleService';
+
+// Notification Service
+var notificationServiceUrl = 'https://hcpms-p2000319942trial.hanatrial.ondemand.com/restnotification/application/com.sap.iot.manager/';
 
 // SENSOR DATA BEGIN
 var sensor_data = {
@@ -127,27 +48,180 @@ var sensor_data = {
     sensorOptical: 0.0,
     sensorTemp: 0.0
 }
-var number_of_sensors_enabled = 0;
-var number_of_sensors_to_enable = 7;
+var numberOfSensorsEnabled = 0; // basically we're going to count the number of sensors enabled, and start the whole loop when it reaches 7
+var numberOfSensorsToEnable = 7;
 // END SENSOR DATA
-var DEBUG_VALUE = true;
-var xtimestamp;
-var date = new Date();
-var time = date.getTime();
-var SHOULD_SEND_TO_SAP = true;
 
-var options = {
-    host: hostIoT,
-    port: portIoT,
-    path: pathIoT + deviceId,
-    agent: false,
-    headers: {
-        'Authorization': authStrIoT,
-        'Content-Type': 'application/json;charset=utf-8',
-        'Accept': '*/*'
-    },
-    method: 'POST',
-};
+var DEBUG_VALUE = true; // print verbose debug statements
+var SHOULD_SEND_TO_SAP = true; // set this to false if you do not want to communicate with cloud platform
+
+function getCredentials(credentials_filename) {
+    /**
+     * @description a helper function to get and store SAP credentials
+     * @param {string} credentials_filename name of file where credentials are going to be stored in
+     * @return the Basic authentication string in Base64
+     */
+    var credential;
+    try {
+        credential = fs.readFileSync(credentials_filename);
+    } catch (e) {
+        console.log("Cannot find credentials file.");
+    }
+    if (credential) {
+        return credential;
+    } else {
+        var SAP_CLOUD_USERNAME = rl.questionEMail('SAP CP Username (email): ');
+        var SAP_CLOUD_PASSWORD = rl.question('SAP CP Password: ', {
+            'hideEchoBack': true
+        });
+        var base64_auth = Buffer.from(SAP_CLOUD_USERNAME + ':' + SAP_CLOUD_PASSWORD).toString('base64');
+        if (rl.keyInYNStrict('Would you like to save your credentials (NOT SECURE - SAVED ON DISK)?')) {
+            fs.writeFileSync(credentials_filename, base64_auth);
+        }
+        return base64_auth;
+    }
+}
+
+function getCurrentTimeAsString() {
+    /**
+     * @returns {String} the current time in Epoch time
+     */
+    date = new Date();
+    return String(Math.floor(date.getTime() / 1000));
+}
+
+var basicAuthString = getCredentials(CREDENTIALS_FILENAME); // used to authenticate to services which require basic auth (SAP CP user + password)
+
+
+var writeLogToDatabase = function (description, code) {
+    /**
+     * @description submits an incident log to the IoT Service
+     * @param {string} description description of the incident
+     * @param {string} code incident code (i.e. "HEAT" or "MOVEMENT")
+     */
+    var body = {
+        mode: "sync",
+        messageType: incidentLogMessageTypeID,
+        messages: [
+            {
+                timestamp: getCurrentTimeAsString(),
+                description: description,
+                incident_code: code
+            }
+        ]
+    };
+    var logWriteOptions = {
+        method: 'POST',
+        url: incidentLogUrl,
+        headers:
+        {
+            Authorization: authStrIncidentLog
+        },
+        body: body,
+        json: true
+    };
+
+    request(logWriteOptions, function (error, response, body) {
+        if (error) throw new Error(error);
+        if (response.statusCode < 200 || response.statusCode > 299) {
+            throw new Error("HTTP" + response.statusCode + " - Non-200 status code returned while writing incident.");
+        }
+        console.log("Successfully submitted incident log.");
+    });
+}
+
+var sendNotification = function (alert, data) {
+    /**
+     * @description sends a push notification to the IoT worker app (https://github.com/FIT4002-SAP/SAP) through SAP Mobile Service
+     * @param {string} alert the alert message to send to the iOS app
+     * @param {string} data data that will be received by the iOS app when the push notification is received.
+     */
+    var notificationOptions = {
+        method: 'POST',
+        url: notificationServiceUrl,
+        headers:
+        {
+            'Cache-Control': 'no-cache',
+            Authorization: 'Basic ' + basicAuthString,
+            'Content-Type': 'application/json'
+        },
+        body:
+        {
+            alert: alert,
+            data: data,
+            sound: 'default'
+        },
+        json: true
+    };
+
+    request(notificationOptions, function (error, response, body) {
+        if (error) throw new Error(error);
+
+        if (response.statusCode < 200 || response.statusCode > 299) {
+            throw new Error("HTTP" + response.statusCode + " - Non-200 status code returned while sending notification.");
+        }
+        console.log("Notification Successfully Sent!");
+    });
+}
+
+var checkData = function (temperature, gyrox, gyroy, gyroz, XSRF, cookie) {
+    /**
+     * @description calls the Business Rules service in order to check whether or not there is abnormal data
+     * @param gyrox value of gyrox (part of gyroscope)
+     * @param gyroy value of gyroy (part of gyroscope)
+     * @param gyroz value of gyroz (part of gyroscope)
+     * @param temperature temperature value from the sensor
+     * @param XSRF xsrf token (obtained from Rule Service endpoint)
+     * @param cookie the cookie to be sent to Rule Service, used to authenticate to the Service
+     */
+    var options = {
+        method: 'POST',
+        url: bpmsInvokeRuleUrl,
+        qs: { rule_service_name: ruleServiceName },
+        headers:
+        {
+            'Cache-Control': 'no-cache',
+            Authorization: 'Basic ' + basicAuthString,
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': XSRF,
+            'Cookie': cookie
+        },
+        body:
+            [{
+                __type__: 'IoTManagerDataObjects',
+                Temperature: temperature,
+                GyroX: gyrox,
+                GyroY: gyroy,
+                GyroZ: gyroz
+            }],
+        json: true
+    };
+    request(options, function (error, response, body) {
+        if (error) throw new Error(error);
+        if (response.statusCode < 200 || response.statusCode > 299) {
+            throw new Error("HTTP" + response.statusCode + " - Non-200 status code returned while calling business rules.");
+        }
+        console.log("#################################################################");
+        var data = JSON.stringify(body);
+        console.log("Response From Business Rules API" + JSON.stringify(body));
+        console.log("body is" + body);
+        console.log("body is" + body[0].MovementDetected);
+        console.log("#################################################################");
+        if (body[0].MovementDetected) {
+            // movement detected! send notification
+            console.log("Movement Warning! Sending Notification...");
+            sendNotification("Movement Warning Triggered!", "MOVEMENT");
+            writeLogToDatabase("Movement Detected", "MOVEMENT");
+        }
+        if (body[0].TemperatureExceeded) {
+            // tower is melting/freezing! send notification
+            console.log("Temperature Warning! Sending Notification...");
+            sendNotification("Temperature Warning Triggered!", "HEAT");
+            writeLogToDatabase("Temperature Exceeded", "HEAT");
+        }
+    });
+
+}
 
 /***************************************************************/
 /* Coding to access TI SensorTag and values of various sensors */
@@ -155,22 +229,32 @@ var options = {
 
 console.log("If not yet activated, then press the power button.");
 
+// get XSRF token from Business Rules
+var XSRFOptions = {
+    method: 'GET',
+    url: bpmsXSRFTokenUrl,
+    headers:
+    {
+        'cache-control': 'no-cache',
+        'x-csrf-token': 'Fetch',
+        authorization: 'Basic ' + basicAuthString
+    }
+};
 request(XSRFOptions, function (error, response, body) {
-  if (error) throw new Error(error);
+    if (error) throw new Error(error);
 
-  var app_XSRF = response.headers['x-csrf-token'];
-  var app_cookie = response.headers['set-cookie'];
-  console.log("Achieved XSRF token from SAP = " + app_XSRF);
-  //##################################################################
+    var app_XSRF = response.headers['x-csrf-token'];
+    var app_cookie = response.headers['set-cookie'];
+    console.log("Achieved XSRF token from SAP = " + app_XSRF);
     SensorTag.discover(function (tag) {
         tag.on('disconnect', function () {
             console.log('disconnected!');
             process.exit(0);
         });
 
-        function connectExecute() {
+        function start() {
             console.log('Connect Device and Execute Sensors');
-            tag.connectAndSetUp(enableSensors);
+            tag.connectAndSetUp(enableSensors); // enableSensors()
         }
 
         function enableSensors() {
@@ -211,20 +295,33 @@ request(XSRFOptions, function (error, response, body) {
             console.log("*********************************************");
             console.log(" To stop press both buttons on the SensorTag ");
             console.log("*********************************************");
-            tag.notifySimpleKey(listenForButton);
+            tag.notifySimpleKey(onBothKeysPressed); // if you press both keys, the program exits
         }
+
         function onSensorEnabled() {
-            number_of_sensors_enabled += 1;
-            if (number_of_sensors_enabled == number_of_sensors_to_enable) {
+            /* basically callback function for when the sensors are enabled; checks that all sensors are enabled before retrieving data */
+            numberOfSensorsEnabled += 1;
+            if (numberOfSensorsEnabled == numberOfSensorsToEnable) {
                 console.log("All sensors enabled! Retrieving data...");
                 initialiseDataRetrievalLoop();
-            } else if (number_of_sensors_enabled > number_of_sensors_to_enable) {
+            } else if (numberOfSensorsEnabled > numberOfSensorsToEnable) {
                 console.error("Number of sensors enabled exceeded limit! Please set the correct limit. Exiting.");
                 tag.disconnect();
             }
         }
 
+        function onBothKeysPressed() {
+            tag.on('simpleKeyChange', function (left, right) {
+                if (left && right) {
+                    tag.disconnect();
+                }
+            });
+        }
+
         function initialiseDataRetrievalLoop() {
+            /**
+             * main loop to retrieve data from the tags and push data to cloud platform
+             */
             setImmediate(function loop() { // schedule this function
                 tag.readIrTemperature(function (error, objectTemperature, ambientTemperature) {
                     sensor_data.sensorObjectTemp = objectTemperature;
@@ -252,44 +349,30 @@ request(XSRFOptions, function (error, response, body) {
                 tag.readLuxometer(function (error, lux) {
                     sensor_data.sensorOptical = lux;
                 });
-                date = new Date();
-                time = String(Math.floor(date.getTime()/1000));
-                sensor_data.timestamp = time;
-                //#############################################################
-                //call business rules API to check for violations
-
+                sensor_data.timestamp = getCurrentTimeAsString();
+                // call business rules API to check for violations
                 checkData(sensor_data.sensorObjectTemp, sensor_data.sensorGyroX, sensor_data.sensorGyroY, sensor_data.sensorGyroZ, app_XSRF, app_cookie);
-
-                //#############################################################
-                sendSensorData(sensor_data);
+                sendSensorData(sensor_data); // send the sensor data
                 setTimeout(loop, 5000); // schedule it again
             });
         }
-        function listenForButton() {
-            tag.on('simpleKeyChange', function (left, right) {
-                if (left && right) {
-                    tag.disconnect();
-                }
-            });
-        }
 
-        connectExecute();
+        start();
     });
-
-  //##################################################################
 });
 
 
 /******************************************************************/
-/* FUNCTION to get Temperature from the Sensor & update into HANA */
+/* function to push sensor data to SAP Cloud Platform */
 /******************************************************************/
 function sendSensorData(sensor_data_payload) {
-    date = new Date();
-    time = date.getTime();
-    var data = { // initialise sensor data payload
+    /**
+     * @param sensor_data_payload the payload as defined by sensor_data
+     */
+    var data = { // initialise sensor data payload (this is going to be sent as a json through POST to the IoT Service API)
         "mode": "sync",
-        "messageType": messageTypeID,
-        "messages": [ // sample message payload; will be overwritten by the program
+        "messageType": iotDataMessageTypeID,
+        "messages": [
             sensor_data_payload
         ]
     }
@@ -297,36 +380,44 @@ function sendSensorData(sensor_data_payload) {
     if (DEBUG_VALUE)
         console.log("Data: " + strData);
     if (SHOULD_SEND_TO_SAP) {
-        if (strData.length > 46) {
-            if (DEBUG_VALUE)
-                console.log("Sending Data to server");
-            /* Process HTTP or HTTPS request */
-            options.agent = new http.Agent(options);
-            var request_callback = function (response) {
-                var body = '';
-                response.on('data', function (data) {
-                    body += data;
-                });
-                response.on('end', function () {
-                    if (DEBUG_VALUE) {
-                        console.log("REQUEST END:", response.statusCode);
-                        console.log("RESPONSE BODY:\n", body);
-                    }
-                });
-                response.on('error', function (e) {
-                    console.error(e);
-                });
-            }
-            var request = http.request(options, request_callback);
-            request.on('error', function (e) {
+        // send data to server
+        var options = {
+            host: hostIoT,
+            port: portIoT,
+            path: pathIoT + iotDeviceId,
+            agent: false,
+            headers: {
+                'Authorization': authStrIoT,
+                'Content-Type': 'application/json;charset=utf-8',
+                'Accept': '*/*'
+            },
+            method: 'POST',
+        };
+        if (DEBUG_VALUE)
+            console.log("Sending Data to server");
+        /* Process HTTP or HTTPS request */
+        options.agent = new http.Agent(options);
+        var request_callback = function (response) {
+            var body = '';
+            response.on('data', function (data) {
+                body += data;
+            });
+            response.on('end', function () {
+                if (DEBUG_VALUE) {
+                    console.log("REQUEST END:", response.statusCode);
+                    console.log("RESPONSE BODY:\n", body);
+                }
+            });
+            response.on('error', function (e) {
                 console.error(e);
             });
-            request.write(strData);
-            request.end();
-        } else {
-            if (DEBUG_VALUE)
-                console.log("Incomplete Data");
         }
+        var request = http.request(options, request_callback);
+        request.on('error', function (e) {
+            console.error(e);
+        });
+        request.write(strData);
+        request.end();
     } else {
         console.log("Skipping sending data to Cloud Platform.")
     }
