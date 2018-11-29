@@ -211,13 +211,13 @@ var checkData = function (temperature, gyrox, gyroy, gyroz, XSRF, cookie) {
             // movement detected! send notification
             console.log("Movement Warning! Sending Notification...");
             sendNotification("Movement Warning Triggered!", "MOVEMENT");
-            writeLogToDatabase("Movement Detected", "MOVEMENT");
+//            writeLogToDatabase("Movement Detected", "MOVEMENT");
         }
         if (body[0].TemperatureExceeded) {
             // tower is melting/freezing! send notification
             console.log("Temperature Warning! Sending Notification...");
             sendNotification("Temperature Warning Triggered!", "HEAT");
-            writeLogToDatabase("Temperature Exceeded", "HEAT");
+//            writeLogToDatabase("Temperature Exceeded", "HEAT");
         }
     });
 
@@ -412,12 +412,12 @@ function sendSensorData(sensor_data_payload) {
                 console.error(e);
             });
         }
-        var request = http.request(options, request_callback);
-        request.on('error', function (e) {
-            console.error(e);
-        });
-        request.write(strData);
-        request.end();
+//        var request = http.request(options, request_callback);
+//        request.on('error', function (e) {
+//            console.error(e);
+//        });
+//        request.write(strData);
+//        request.end();
     } else {
         console.log("Skipping sending data to Cloud Platform.")
     }
