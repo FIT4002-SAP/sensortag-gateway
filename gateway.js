@@ -100,7 +100,7 @@ var writeLogToDatabase = function (description, code) {
      * @param {string} code incident code (i.e. "HEAT" or "MOVEMENT")
      */
     var body = {
-        mode: "sync",
+        mode: "async",
         messageType: incidentLogMessageTypeID,
         messages: [
             {
@@ -370,7 +370,7 @@ function sendSensorData(sensor_data_payload) {
      * @param sensor_data_payload the payload as defined by sensor_data
      */
     var data = { // initialise sensor data payload (this is going to be sent as a json through POST to the IoT Service API)
-        "mode": "sync",
+        "mode": "async",
         "messageType": iotDataMessageTypeID,
         "messages": [
             sensor_data_payload
